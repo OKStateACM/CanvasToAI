@@ -2,3 +2,4 @@ downloads/
 playwright_profile/
 venv/
 __pycache__/
+.env

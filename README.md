@@ -13,16 +13,14 @@ Welcome! In this workshop you'll learn how to automate web browsers using **Play
 ### 1. Install Dependencies
 
 ```bash
-pip install playwright
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
 playwright install chromium
 ```
 
 ### 2. Set Up Environment Variables
 
-```bash
-# Copy the example .env file and fill in your values
-cp .env.example .env
-```
 
 Edit `.env` with your Canvas LMS credentials (needed only if you want to pull assignments automatically).
 
