@@ -1,60 +1,55 @@
-# =============================================================================
-# 🛠️ WORKSHOP: Gemini Automation with Playwright
-# =============================================================================
-#
-# INSTRUCTIONS:
-#   Replace every _______ blank with the correct code.
-#   Each blank has a HINT comment above it to guide you.
-#   Run the completed script to automate Google Gemini through your browser!
-#
-# CONCEPTS COVERED:
-#   • Launching a persistent browser context with Playwright
-#   • Navigating to URLs and waiting for page load
-#   • Using multiple CSS selectors for resilient element finding
-#   • Handling dynamic menus and popups
-#   • File upload via file chooser interception
-#   • Typing text into contenteditable areas
-#   • Keyboard actions (Enter to send)
-#
-# =============================================================================
-
 from playwright.sync_api import sync_playwright
 import os
 import time
 import re
+import tkinter as tk
 
 class GeminiBot:
     def __init__(self, user_data_dir="playwright_profile"):
-        # HINT: Convert the user_data_dir to an absolute path using os.path
-        self.user_data_dir = _______
+        self.user_data_dir = os.path.abspath(user_data_dir)
+
+    def _get_dynamic_size(self):
+        """Returns a reasonable window size (width, height) based on screen resolution."""
+        # We use a small temporary tkinter root to get the screen size
+        try:
+            root = tk.Tk()
+            sw = root.winfo_screenwidth()
+            sh = root.winfo_screenheight()
+            root.destroy()
+            
+            # Use 50% of width and 80% of height, but not too small
+            target_w = max(1024, int(sw * 0.5))
+            target_h = max(768, int(sh * 0.8))
+            
+            # Ensure we don't exceed screen size
+            target_w = min(target_w, sw)
+            target_h = min(target_h, sh)
+            
+            return target_w, target_h
+        except Exception:
+            return 1024, 768
 
     def setup_login(self):
-        """Opens a browser so the user can log into their Google account for Gemini."""
-
         print(f"Opening Gemini for initial setup/login. Data dir: {self.user_data_dir}")
-
+        width, height = self._get_dynamic_size()
         with sync_playwright() as p:
-            # HINT: Launch a PERSISTENT Chromium context.
-            #       Key args: user_data_dir, headless=False, channel="chrome"
-            browser = p.chromium._______(
+            browser = p.chromium.launch_persistent_context(
                 user_data_dir=self.user_data_dir,
-                headless=_______,
+                headless=False,
                 channel="chrome",
                 args=[
-                    "--window-size=1280,900",
+                    f"--window-size={width},{height}",
                     "--disable-blink-features=AutomationControlled"
                 ],
-                viewport={'width': 1280, 'height': 900},
+                viewport={'width': width, 'height': height},
                 ignore_default_args=["--enable-automation"]
             )
-
-            # HINT: Get the first existing page or create a new one
-            page = browser.pages[0] if len(browser.pages) > 0 else browser._______()
-
-            # HINT: Navigate to Gemini's web app
-            page._______(________)
-
-            print("Please log in to your Google Account if required. Close the browser when finished.")
+            page = browser.pages[0] if len(browser.pages) > 0 else browser.new_page()
+            
+            # Go directly to Gemini
+            page.goto("https://gemini.google.com/app")
+            
+            print("Please log in to your Google Account if required. Close the browser when you are finished.")
             try:
                 page.wait_for_event("close", timeout=0)
             except Exception:
@@ -63,159 +58,169 @@ class GeminiBot:
             print("Gemini Setup finished!")
 
     def run_automation(self, prompt, attachment_paths):
-        """Automates sending a prompt (and optional files) to Google Gemini."""
-
         print(f"Starting Playwright automation for Gemini. Data dir: {self.user_data_dir}")
-
+        width, height = self._get_dynamic_size()
         with sync_playwright() as p:
-            # HINT: Launch persistent context, same as setup, but also disable
-            #       the Translate feature to avoid popup interference
-            browser = p.chromium._______(
+            browser = p.chromium.launch_persistent_context(
                 user_data_dir=self.user_data_dir,
                 headless=False,
-                channel=_______,
+                channel="chrome",
                 args=[
-                    "--window-size=1280,900",
+                    f"--window-size={width},{height}",
                     "--disable-blink-features=AutomationControlled",
-                    "--disable-features=Translate"
+                    "--disable-features=Translate",
+                    "--lang=es-ES"
                 ],
-                viewport={'width': 1280, 'height': 900},
+                viewport={'width': width, 'height': height},
                 ignore_default_args=["--enable-automation"]
             )
-
+            
             page = browser.pages[0] if len(browser.pages) > 0 else browser.new_page()
-
-            # HINT: Navigate to Gemini
-            page._______(________)
-
+            
+            # Set extra headers for consistency if needed
+            page.set_extra_http_headers({"Accept-Language": "es-ES,es;q=0.9"})
+            
+            page.goto("https://gemini.google.com/app")
+            
             print("Waiting for chat page to be ready...")
             try:
-                # HINT: Gemini's chat input is a <div> with contenteditable="true".
-                #       Wait for it using page.wait_for_selector(...)
-                page._______(_______, timeout=10000)
+                # Wait for the chat input box (Gemini usually uses a contenteditable div or rich-textarea)
+                page.wait_for_selector('div[contenteditable="true"]', timeout=10000) 
             except Exception:
-                print("Could not find chat input. Did you use the 'Setup Gemini Login' button? Exiting.")
+                print("Could not find chat input. Did you use the 'Setup Gemini Login' button? Exiting automation.")
                 browser.close()
                 return
-
+                
             print("Gemini Chat page is ready! Proceeding with auto-upload...")
             try:
-
-                # ------ FILE ATTACHMENT SECTION ------
+                
+                # Attach files if any exist
                 if attachment_paths:
-                    # HINT: Filter to only paths that exist on disk
-                    valid_paths = [os.path.abspath(p) for p in attachment_paths if _______]
+                    valid_paths = [os.path.abspath(p) for p in attachment_paths if os.path.exists(p)]
                     if valid_paths:
                         try:
                             print(f"Attempting to upload {len(valid_paths)} files...")
-
-                            # STRATEGY: Find the upload trigger button (the "+" button).
-                            # Gemini's UI can show different aria-labels depending on language,
-                            # so we try MULTIPLE selectors for resilience.
+                                
+                            # Robust attempt to find the upload trigger (the plus button)
+                            # We'll try multiple times and multiple selectors
                             upload_trigger = None
                             for attempt in range(4):
+                                # Selector ordered from most specific to more general
                                 selectors = [
-                                    # HINT: Fill in CSS selectors that might match the attach/upload button.
-                                    #       Think about: aria-controls, aria-label, mat-icon names, etc.
                                     'button[aria-controls="upload-file-menu"]',
-                                    _______,  # HINT: a selector using aria-label that contains "add" (case-insensitive)
-                                    _______,  # HINT: a selector using aria-label that contains "upload" (case-insensitive)
+                                    'uploader button',
+                                    '.upload-card-button',
+                                    'button:has(mat-icon[data-mat-icon-name="add_2"])',
+                                    'button:has(mat-icon:has-text("add_2"))',
+                                    'button[aria-label*="subir" i]',
+                                    'button[aria-label*="añadir" i]',
+                                    'button[aria-label*="add" i]',
+                                    'button[aria-label*="upload" i]'
                                 ]
-
+                                
                                 for selector in selectors:
                                     trigger = page.locator(selector).first
-                                    # HINT: Check that the element exists AND is visible
-                                    if trigger.count() > 0 and trigger._______():
+                                    if trigger.count() > 0 and trigger.is_visible():
                                         upload_trigger = trigger
                                         break
-
+                                
                                 if upload_trigger:
                                     break
-
+                                
                                 print(f"Upload button not found (attempt {attempt+1}/4). Waiting...")
-                                # HINT: Wait 1500ms before retrying. Use page.wait_for_timeout(...)
-                                page._______(________)
-
+                                page.wait_for_timeout(1500)
+                            
                             if upload_trigger:
-                                print("Found upload trigger button. Clicking...")
-                                # HINT: Click the upload trigger button
-                                upload_trigger._______()
-                                page.wait_for_timeout(2000)  # Wait for menu animation
-
-                                # Now find the "Upload from computer" menu item
+                                print(f"Found upload trigger button using selector: {upload_trigger}. Clicking...")
+                                upload_trigger.click()
+                                page.wait_for_timeout(2000) # Wait for menu animation
+                                
+                                # Try to find the "Upload from computer" / "Subir desde este ordenador" menu item
+                                # We check multiple common labels and roles
                                 menu_selectors = [
                                     'button[data-test-id="local-images-files-uploader-button"]',
-                                    'button[role="menuitem"]:has-text("Upload from computer")',
+                                    'button:has(mat-icon[fonticon="attach_file"])',
+                                    'button:has(mat-icon[data-mat-icon-name="attach_file"])',
+                                    'button[role="menuitem"]:has-text("Subir archivos")',
                                     'button[role="menuitem"]:has-text("Subir desde este ordenador")',
+                                    'button[role="menuitem"]:has-text("Upload from computer")',
+                                    'button[role="menuitem"]:has-text("Subir desde tu computadora")',
+                                    '[role="menuitem"] mat-label:has-text("Subir desde")',
+                                    '[role="menuitem"]:has(mat-icon:has-text("upload"))',
+                                    'text=/Upload from computer/i',
+                                    'text=/Subir desde este ordenador/i',
+                                    'text=/Subir desde tu computadora/i'
                                 ]
-
+                                
                                 menu_item = None
                                 for selector in menu_selectors:
-                                    # HINT: Find the first matching element using page.locator(selector).first
-                                    item = page._______(selector)._______
+                                    item = page.locator(selector).first
                                     if item.count() > 0 and item.is_visible():
                                         menu_item = item
                                         break
+                                
+                                if not menu_item:
+                                    # Fallback searching by aria-label regex
+                                    menu_item = page.get_by_label(re.compile(r"Upload from computer|Subir desde.*ordenador|Subir desde.*computadora|Your computer", re.I)).first
 
                                 try:
                                     if menu_item and menu_item.count() > 0 and menu_item.is_visible():
                                         print("Found menu item for local upload. Clicking...")
-                                        # HINT: Use page.expect_file_chooser() to intercept the
-                                        #       file dialog, then click the menu item inside the with block
-                                        with page._______(timeout=10000) as fc_info:
+                                        with page.expect_file_chooser(timeout=10000) as fc_info:
                                             menu_item.click()
-                                        # HINT: Set files on the intercepted file chooser
-                                        fc_info.value._______(valid_paths)
+                                        fc_info.value.set_files(valid_paths)
                                     else:
-                                        print("Menu item not found. Pressing Escape and trying fallback...")
-                                        # HINT: Press the Escape key to close any open menu
-                                        page.keyboard.press(_______)
+                                        # If the menu didn't appear as expected, try the hidden buttons observed in the HTML
+                                        print("Menu item not found or not visible. Trying hidden upload buttons fallback...")
+                                        page.keyboard.press("Escape") # Close any open menu
                                         page.wait_for_timeout(500)
+                                        
+                                        # Target the specific hidden buttons from geminiHome.html
+                                        hidden_selector = 'button[data-test-id="hidden-local-file-upload-button"], .hidden-local-file-upload-button'
+                                        hidden_btn = page.locator(hidden_selector).first
+                                        
+                                        if hidden_btn.count() > 0:
+                                            print("Found hidden local file upload button. Triggering...")
+                                            with page.expect_file_chooser(timeout=10000) as fc_info:
+                                                hidden_btn.click(force=True)
+                                            fc_info.value.set_files(valid_paths)
+                                        else:
+                                            # Last resort: try clicking the trigger itself again with file chooser expectation
+                                            print("Hidden button not found. Trying direct click on trigger as last resort...")
+                                            with page.expect_file_chooser(timeout=7000) as fc_info:
+                                                upload_trigger.click()
+                                            fc_info.value.set_files(valid_paths)
                                 except Exception as e:
                                     print(f"File chooser failed to trigger: {e}")
                             else:
-                                print("Could not find the attach button after multiple attempts.")
-
+                                print("Could not find the attach button (plus button) on the Gemini interface after multiple attempts.")
+                            
+                            # Wait for uploads to complete
                             print(f"Successfully processed {len(valid_paths)} files.")
                             time.sleep(6)
-
+                              
                         except Exception as e:
                             print(f"Could not automate file attachment: {e}")
                             print("Please attach files manually if needed.")
-
-                # ------ PROMPT INJECTION SECTION ------
+            
+                # Fill the prompt
                 print("Injecting prompt...")
-                # HINT: Gemini uses a contenteditable div, NOT a regular <input>.
-                #       We need to: 1) Click on it,  2) Use keyboard.insert_text() to type
-                chat_box = page.locator(_______).first
-                chat_box._______()
-                # HINT: Use page.keyboard.insert_text(text) to type the prompt
-                page.keyboard._______(prompt)
+                chat_box = page.locator('div[contenteditable="true"]').first
+                chat_box.click()
+                page.keyboard.insert_text(prompt)
                 time.sleep(1)
-
-                # ------ SEND SECTION ------
-                # HINT: Press Enter to send the message in Gemini
-                page.keyboard.press(_______)
-
+                
+                # Send
+                page.keyboard.press("Enter")
+                    
             except Exception as e:
                 print(f"Error during Gemini automation: {e}")
-
+                
             print("Handoff to user! The browser will stay open so you can read the response.")
             print("Close the browser window when you are done.")
             try:
                 page.wait_for_event("close", timeout=0)
             except Exception:
                 pass
-
+            
             browser.close()
-
-
-# =============================================================================
-# 🧪 QUICK TEST — Uncomment the lines below to try your implementation!
-# =============================================================================
-# if __name__ == "__main__":
-#     bot = GeminiBot()
-#     # Step 1: Run setup first to log in (only needed once)
-#     # bot.setup_login()
-#     # Step 2: Then run the automation
-#     # bot.run_automation("Summarize the key concepts of machine learning", [])

@@ -1,71 +1,82 @@
-# 🎓 Playwright Automation Workshop
+# CanvasToAI 🎓🤖
 
-Welcome! In this workshop you'll learn how to automate web browsers using **Playwright** by building bots that interact with **ChatGPT** and **Google Gemini**.
+**CanvasToAI** is a synchronization tool that connects your **Canvas LMS** assignments to Generative AI engines (**ChatGPT** and **Google Gemini**). 
 
-## 📋 Prerequisites
+The application automates the tedious task of manually copying assignment details and uploading files to your favorite AI assistant by using **Playwright** behind the scenes. 
 
-- Python 3.9+
-- Google Chrome installed
-- A ChatGPT account and/or a Google account
+
+## ✨ Features
+
+- 🔗 **Canvas API Integration**: Fetches your upcoming, active assignments automatically.
+- 📁 **Auto-File Handling**: Downloads all assignment attachments (PDFs, PPTXs, Source files) and prepares them for the AI.
+- 🤖 **Multi-AI Support**: Fully automated, browser-based interaction with **ChatGPT** and **Google Gemini**.
+- 🔐 **Persistent Sessions**: Log in once, and the bot remembers your session for future runs.
+- 🖥️ **Interactive UI**: A simple, user-friendly interface powered by `tkinter`.
+
+---
 
 ## 🚀 Getting Started
 
-### 1. Install Dependencies
+### 1. Prerequisites
+
+- **Python 3.9+**
+- **Google Chrome** installed (used for better bot detection avoidance).
+
+### 2. Installation
+
+Clone the repository and install the dependencies:
 
 ```bash
-python -m venv .venv
-.venv\Scripts\activate
+# Create and activate virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install requirements
 pip install -r requirements.txt
+
+# Install Playwright browser drivers
 playwright install chromium
 ```
 
-### 2. Set Up Environment Variables
+### 3. Configuration
 
+Rename `.env.example` to `.env` and fill in your details:
 
-Edit `.env` with your Canvas LMS credentials (needed only if you want to pull assignments automatically).
-
-### 3. Complete the Workshop Files
-
-Open the two automation files and **fill in the blanks** (`_______`):
-
-| File | Difficulty | What You'll Learn |
-|------|-----------|-------------------|
-| `chatgpt_automation.py` | ⭐⭐ Intermediate | Selectors, `fill()`, hidden file inputs, `data-testid` |
-| `gemini_automation.py` | ⭐⭐⭐ Advanced | Multi-selector retry loops, contenteditable divs, file chooser interception |
-
-Each blank has a **HINT** comment right above it to guide you!
-
-### 4. Test Your Work
-
-```python
-# Test ChatGPT bot
-python chatgpt_automation.py
-
-# Test Gemini bot
-python gemini_automation.py
+```env
+CANVAS_DOMAIN=https://canvas.yourschool.edu
+CANVAS_API_TOKEN=your_token_here
 ```
 
-## 🧩 Key Playwright Concepts
+> [!TIP]
+> To get your **Canvas API Token**, go to **Canvas** → **Account** → **Settings** → **New Access Token**.
 
-| Concept | ChatGPT File | Gemini File |
-|---------|-------------|-------------|
-| Persistent Context | ✅ | ✅ |
-| `page.goto()` | ✅ | ✅ |
-| `page.wait_for_selector()` | ✅ | ✅ |
-| `page.fill()` | ✅ | |
-| `page.locator()` | ✅ | ✅ |
-| `set_input_files()` | ✅ | |
-| `expect_file_chooser()` | ✅ | ✅ |
-| `keyboard.insert_text()` | | ✅ |
-| `keyboard.press()` | ✅ | ✅ |
-| Multi-selector resilience | | ✅ |
-| Retry loops | | ✅ |
+---
 
-## 💡 Tips
+## 🎮 Usage
 
-- **Run `setup_login()` first!** You need to log in once so your session cookies get saved.
-- **Use `headless=False`** — you need to see the browser to debug your selectors!
-- **Check DevTools** — Right-click → Inspect to find element selectors on the page.
-- If a selector doesn't work, try alternatives: `data-testid`, `aria-label`, `:has-text()`.
+Run the main application:
 
-Good luck! 🚀
+```bash
+python main.py
+```
+
+### Initial Setup
+1. Open the app and click the **Setup Login** button for your preferred AI (ChatGPT or Gemini).
+2. A browser window will open; log in to your account manually.
+3. Close the browser when finished. The app will save your session!
+
+### Interacting with Assignments
+1. Refresh the assignment list in the UI.
+2. Select an assignment and pick your AI target.
+3. Click **Play** ▶️ — Watch the bot fetch context, upload files, and prepare your prompt!
+
+---
+
+## 🎓 Workshop
+
+Interested in learning how this works? Check out the workshop folder for step-by-step exercises to build your own Playwright automation bots from scratch!
+---
+
+## ⚖️ License
+
+Made for **OKState ACM**. For educational use only.
